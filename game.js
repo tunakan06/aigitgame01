@@ -2,14 +2,23 @@
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const W = canvas.width;
-const H = canvas.height;
+const W = canvas.width;   // 480
+const H = canvas.height;  // 640
 
 const scoreUI = document.getElementById('score-ui');
 const levelUI = document.getElementById('level-ui');
 const livesUI = document.getElementById('lives-ui');
 const overlay = document.getElementById('overlay');
 const startBtn = document.getElementById('start-btn');
+
+// ===== 画面スケーリング（スマホ対応） =====
+function applyScale() {
+  const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+  document.getElementById('game-container').style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', applyScale);
+window.addEventListener('orientationchange', applyScale);
+applyScale();
 
 // ===== ゲーム状態 =====
 let state = 'title'; // 'title' | 'playing' | 'gameover'
@@ -19,7 +28,7 @@ let level = 1;
 let frame = 0;
 let animId = null;
 
-// ===== 入力 =====
+// ===== キーボード入力 =====
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
@@ -29,6 +38,166 @@ document.addEventListener('keydown', e => {
   }
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ===== タッチ入力（スマホ対応） =====
+const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+// タッチデバイスならタイトルの操作説明を更新
+if (isTouchDevice) {
+  document.getElementById('controls-hint').innerHTML =
+    '左側ドラッグ : 移動<br>右側タップ&ホールド : 射撃';
+}
+
+// スクリーン座標 → キャンバス論理座標（CSSスケールを考慮）
+function toCanvas(touch) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (touch.clientX - rect.left) * (W / rect.width),
+    y: (touch.clientY - rect.top)  * (H / rect.height),
+  };
+}
+
+// 仮想ジョイスティック（フローティング型：タッチした場所が基点）
+const joystick = {
+  active: false,
+  id: null,
+  baseX: 0, baseY: 0,  // タッチした基点
+  curX: 0,  curY: 0,   // 現在のノブ位置
+  maxR: 65,            // 最大移動半径（canvas px）
+  dx: 0, dy: 0,        // アナログ入力値 (-1.0 〜 1.0)
+};
+
+// 射撃ボタン（右下固定）
+const fireBtn = {
+  active: false,
+  id: null,
+  x: W - 88,
+  y: H - 108,
+  r: 58,
+};
+
+function handleTouchStart(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    const p = toCanvas(t);
+    // 左60%: ジョイスティックゾーン
+    if (!joystick.active && p.x < W * 0.6) {
+      joystick.active = true;
+      joystick.id     = t.identifier;
+      joystick.baseX  = p.x;
+      joystick.baseY  = p.y;
+      joystick.curX   = p.x;
+      joystick.curY   = p.y;
+      joystick.dx     = 0;
+      joystick.dy     = 0;
+    }
+    // 右40%: 射撃ゾーン
+    else if (!fireBtn.active && p.x >= W * 0.6) {
+      fireBtn.active = true;
+      fireBtn.id     = t.identifier;
+    }
+  }
+}
+
+function handleTouchMove(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === joystick.id) {
+      const p  = toCanvas(t);
+      const dx = p.x - joystick.baseX;
+      const dy = p.y - joystick.baseY;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0) {
+        const clamped = Math.min(dist, joystick.maxR);
+        // アナログ値: 指の移動量に比例（小さく動かすとゆっくり移動）
+        joystick.dx   = (dx / dist) * (clamped / joystick.maxR);
+        joystick.dy   = (dy / dist) * (clamped / joystick.maxR);
+        joystick.curX = joystick.baseX + (dx / dist) * clamped;
+        joystick.curY = joystick.baseY + (dy / dist) * clamped;
+      } else {
+        joystick.dx   = 0;
+        joystick.dy   = 0;
+        joystick.curX = joystick.baseX;
+        joystick.curY = joystick.baseY;
+      }
+    }
+  }
+}
+
+function handleTouchEnd(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === joystick.id) {
+      joystick.active = false;
+      joystick.id     = null;
+      joystick.dx     = 0;
+      joystick.dy     = 0;
+    }
+    if (t.identifier === fireBtn.id) {
+      fireBtn.active = false;
+      fireBtn.id     = null;
+    }
+  }
+}
+
+canvas.addEventListener('touchstart',  handleTouchStart, { passive: false });
+canvas.addEventListener('touchmove',   handleTouchMove,  { passive: false });
+canvas.addEventListener('touchend',    handleTouchEnd,   { passive: false });
+canvas.addEventListener('touchcancel', handleTouchEnd,   { passive: false });
+
+// ===== 仮想コントローラー描画 =====
+function drawVirtualControls() {
+  if (!isTouchDevice) return;
+  ctx.save();
+
+  // ── ジョイスティック ──
+  if (joystick.active) {
+    // ベースリング
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = '#adf';
+    ctx.lineWidth   = 3;
+    ctx.beginPath();
+    ctx.arc(joystick.baseX, joystick.baseY, joystick.maxR, 0, Math.PI * 2);
+    ctx.stroke();
+    // ノブ
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle   = '#adf';
+    ctx.beginPath();
+    ctx.arc(joystick.curX, joystick.curY, 26, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // 非アクティブ時: 薄い点線でヒント表示
+    ctx.globalAlpha = 0.15;
+    ctx.strokeStyle = '#adf';
+    ctx.lineWidth   = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.arc(110, H - 120, joystick.maxR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle   = '#adf';
+    ctx.beginPath();
+    ctx.arc(110, H - 120, 26, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── 射撃ボタン ──
+  ctx.globalAlpha = fireBtn.active ? 0.7 : 0.3;
+  ctx.fillStyle   = fireBtn.active ? '#f60' : '#f44';
+  ctx.beginPath();
+  ctx.arc(fireBtn.x, fireBtn.y, fireBtn.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalAlpha  = fireBtn.active ? 1.0 : 0.6;
+  ctx.fillStyle    = '#fff';
+  ctx.font         = 'bold 16px "Courier New"';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('FIRE', fireBtn.x, fireBtn.y);
+
+  ctx.restore();
+}
 
 // ===== 星背景 =====
 const stars = Array.from({ length: 80 }, () => ({
@@ -64,7 +233,7 @@ const player = {
   w: 36,
   h: 36,
   speed: 4.5,
-  invincible: 0,   // 無敵フレーム数
+  invincible: 0,
   shootCooldown: 0,
 };
 
@@ -77,16 +246,34 @@ function resetPlayer() {
 
 function updatePlayer() {
   const spd = player.speed;
-  if (keys['ArrowLeft'] || keys['KeyA'])  player.x -= spd;
-  if (keys['ArrowRight'] || keys['KeyD']) player.x += spd;
-  if (keys['ArrowUp'] || keys['KeyW'])    player.y -= spd;
-  if (keys['ArrowDown'] || keys['KeyS'])  player.y += spd;
+
+  // キーボード入力（デジタル）
+  let kdx = 0, kdy = 0;
+  if (keys['ArrowLeft'] || keys['KeyA'])  kdx -= 1;
+  if (keys['ArrowRight'] || keys['KeyD']) kdx += 1;
+  if (keys['ArrowUp'] || keys['KeyW'])    kdy -= 1;
+  if (keys['ArrowDown'] || keys['KeyS'])  kdy += 1;
+
+  const klen = Math.hypot(kdx, kdy);
+  if (klen > 0) {
+    player.x += (kdx / klen) * spd;
+    player.y += (kdy / klen) * spd;
+  }
+
+  // ジョイスティック入力（アナログ: 傾け量に比例した速度）
+  if (joystick.active) {
+    player.x += joystick.dx * spd;
+    player.y += joystick.dy * spd;
+  }
 
   player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x));
   player.y = Math.max(player.h / 2, Math.min(H - player.h / 2, player.y));
 
   if (player.invincible > 0) player.invincible--;
   if (player.shootCooldown > 0) player.shootCooldown--;
+
+  // 射撃ボタン長押しで連射
+  if (state === 'playing' && fireBtn.active) playerShoot();
 }
 
 function drawPlayer() {
@@ -131,7 +318,6 @@ function drawPlayer() {
 
 // ===== プレイヤー弾 =====
 const bullets = [];
-let lastShootFrame = -20;
 
 function playerShoot() {
   if (player.shootCooldown > 0) return;
@@ -152,7 +338,6 @@ function updateBullets() {
     b.y += b.vy || 0;
     b.x += b.vx || 0;
   }
-  // 画面外削除
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     if (b.y < -20 || b.y > H + 20 || b.x < -20 || b.x > W + 20) bullets.splice(i, 1);
@@ -220,7 +405,6 @@ function updateEnemies() {
       }
     }
   }
-  // 画面外削除
   for (let i = enemies.length - 1; i >= 0; i--) {
     if (enemies[i].y > H + 50) enemies.splice(i, 1);
   }
@@ -232,13 +416,11 @@ function drawEnemies() {
     ctx.translate(e.x, e.y);
     ctx.rotate(e.angle);
 
-    // 本体
     ctx.shadowBlur = 10;
     ctx.shadowColor = e.color;
     ctx.fillStyle = e.color;
 
     if (e.size >= 32) {
-      // 大型敵
       ctx.beginPath();
       ctx.moveTo(0, -e.size);
       ctx.lineTo(e.size * 0.8, -e.size * 0.2);
@@ -247,7 +429,6 @@ function drawEnemies() {
       ctx.lineTo(-e.size * 0.8, -e.size * 0.2);
       ctx.closePath();
     } else if (e.size >= 24) {
-      // 中型敵
       ctx.beginPath();
       ctx.moveTo(0, e.size);
       ctx.lineTo(e.size, -e.size * 0.5);
@@ -255,7 +436,6 @@ function drawEnemies() {
       ctx.lineTo(-e.size, -e.size * 0.5);
       ctx.closePath();
     } else {
-      // 小型敵
       ctx.beginPath();
       ctx.moveTo(0, e.size);
       ctx.lineTo(e.size * 0.7, -e.size * 0.5);
@@ -264,7 +444,6 @@ function drawEnemies() {
     }
     ctx.fill();
 
-    // HPバー（2HP以上）
     if (e.maxHp > 1) {
       const bw = e.size * 2;
       const bx = -e.size;
@@ -417,6 +596,8 @@ function startGame() {
   bullets.length = 0;
   enemies.length = 0;
   particles.length = 0;
+  joystick.active = false;
+  fireBtn.active  = false;
   resetPlayer();
   updateHUD();
   overlay.style.display = 'none';
@@ -427,12 +608,15 @@ function startGame() {
 
 function gameOver() {
   state = 'gameover';
+  const hint = isTouchDevice
+    ? '左ドラッグ: 移動 / 右タップ: 射撃'
+    : 'WASD/矢印: 移動 / スペース/Z: 射撃';
   overlay.style.display = 'flex';
   overlay.innerHTML = `
     <h1>GAME OVER</h1>
     <div class="score-display">スコア: ${score}</div>
     <p>レベル ${level} まで到達！</p>
-    <button id="start-btn" style="margin-top:20px;padding:12px 32px;font-size:18px;font-family:'Courier New',monospace;background:transparent;border:2px solid #0ff;color:#0ff;cursor:pointer;">もう一度</button>
+    <button id="start-btn" style="margin-top:24px;padding:14px 40px;font-size:20px;font-family:'Courier New',monospace;background:transparent;border:2px solid #0ff;color:#0ff;cursor:pointer;touch-action:manipulation;">もう一度</button>
   `;
   document.getElementById('start-btn').addEventListener('click', startGame);
 }
@@ -469,6 +653,7 @@ function loop() {
   drawBullets();
   drawEnemies();
   drawPlayer();
+  drawVirtualControls();
 
   updateHUD();
 }

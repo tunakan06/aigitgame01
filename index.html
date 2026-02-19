@@ -2,34 +2,44 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
   <title>スペースシューター</title>
   <style>
-    * {
+    *, *::before, *::after {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
 
-    body {
+    html, body {
+      width: 100%;
+      height: 100%;
       background: #000;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Courier New', monospace;
+    }
+
+    body {
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      overflow: hidden;
-      font-family: 'Courier New', monospace;
     }
 
     #game-container {
       position: relative;
       width: 480px;
       height: 640px;
+      transform-origin: center center;
+      flex-shrink: 0;
     }
 
     canvas {
       display: block;
-      border: 1px solid #333;
+      border: 1px solid #222;
     }
 
     #ui {
@@ -37,11 +47,11 @@
       top: 0;
       left: 0;
       width: 100%;
-      padding: 10px 14px;
+      padding: 12px 14px;
       display: flex;
       justify-content: space-between;
       color: #0ff;
-      font-size: 14px;
+      font-size: 16px;
       pointer-events: none;
       text-shadow: 0 0 6px #0ff;
     }
@@ -56,57 +66,50 @@
       align-items: center;
       color: #fff;
       text-align: center;
-      background: rgba(0,0,0,0.75);
+      background: rgba(0,0,0,0.78);
+      padding: 24px;
     }
 
     #overlay h1 {
       font-size: 36px;
       color: #0ff;
       text-shadow: 0 0 12px #0ff;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }
 
     #overlay p {
       font-size: 14px;
       color: #aaa;
       margin-bottom: 8px;
+      line-height: 1.7;
     }
 
     #overlay .score-display {
-      font-size: 20px;
+      font-size: 22px;
       color: #ff0;
       text-shadow: 0 0 8px #ff0;
-      margin: 12px 0;
+      margin: 14px 0;
     }
 
     #start-btn {
-      margin-top: 20px;
-      padding: 12px 32px;
-      font-size: 18px;
+      margin-top: 24px;
+      padding: 14px 40px;
+      font-size: 20px;
       font-family: 'Courier New', monospace;
       background: transparent;
       border: 2px solid #0ff;
       color: #0ff;
       cursor: pointer;
       text-shadow: 0 0 6px #0ff;
-      box-shadow: 0 0 12px #0ff44;
-      transition: all 0.2s;
+      transition: all 0.15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    #start-btn:hover {
+    #start-btn:hover,
+    #start-btn:active {
       background: #0ff;
       color: #000;
-    }
-
-    #controls {
-      position: absolute;
-      bottom: 10px;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      color: #555;
-      font-size: 11px;
-      pointer-events: none;
     }
   </style>
 </head>
@@ -118,14 +121,15 @@
     <span id="level-ui">レベル: 1</span>
     <span id="lives-ui">残機: ❤️❤️❤️</span>
   </div>
-  <div id="overlay" id="overlay">
+  <div id="overlay">
     <h1>SPACE SHOOTER</h1>
-    <p>矢印キー / WASD で移動</p>
-    <p>スペース / Z で射撃</p>
+    <p id="controls-hint">
+      ← → ↑ ↓ / WASD : 移動<br>
+      スペース / Z : 射撃
+    </p>
     <p>敵を倒してスコアを稼ごう！</p>
     <button id="start-btn">スタート</button>
   </div>
-  <div id="controls">← → ↑ ↓ / WASD: 移動 &nbsp;|&nbsp; SPACE / Z: 射撃</div>
 </div>
 
 <script src="game.js"></script>
