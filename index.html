@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スペースシューター</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+    }
+
+    #game-container {
+      position: relative;
+      width: 480px;
+      height: 640px;
+    }
+
+    canvas {
+      display: block;
+      border: 1px solid #333;
+    }
+
+    #ui {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      color: #0ff;
+      font-size: 14px;
+      pointer-events: none;
+      text-shadow: 0 0 6px #0ff;
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      text-align: center;
+      background: rgba(0,0,0,0.75);
+    }
+
+    #overlay h1 {
+      font-size: 36px;
+      color: #0ff;
+      text-shadow: 0 0 12px #0ff;
+      margin-bottom: 16px;
+    }
+
+    #overlay p {
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 8px;
+    }
+
+    #overlay .score-display {
+      font-size: 20px;
+      color: #ff0;
+      text-shadow: 0 0 8px #ff0;
+      margin: 12px 0;
+    }
+
+    #start-btn {
+      margin-top: 20px;
+      padding: 12px 32px;
+      font-size: 18px;
+      font-family: 'Courier New', monospace;
+      background: transparent;
+      border: 2px solid #0ff;
+      color: #0ff;
+      cursor: pointer;
+      text-shadow: 0 0 6px #0ff;
+      box-shadow: 0 0 12px #0ff44;
+      transition: all 0.2s;
+    }
+
+    #start-btn:hover {
+      background: #0ff;
+      color: #000;
+    }
+
+    #controls {
+      position: absolute;
+      bottom: 10px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: #555;
+      font-size: 11px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="game-container">
+  <canvas id="gameCanvas" width="480" height="640"></canvas>
+  <div id="ui">
+    <span id="score-ui">スコア: 0</span>
+    <span id="level-ui">レベル: 1</span>
+    <span id="lives-ui">残機: ❤️❤️❤️</span>
+  </div>
+  <div id="overlay" id="overlay">
+    <h1>SPACE SHOOTER</h1>
+    <p>矢印キー / WASD で移動</p>
+    <p>スペース / Z で射撃</p>
+    <p>敵を倒してスコアを稼ごう！</p>
+    <button id="start-btn">スタート</button>
+  </div>
+  <div id="controls">← → ↑ ↓ / WASD: 移動 &nbsp;|&nbsp; SPACE / Z: 射撃</div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
